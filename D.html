@@ -1,0 +1,1694 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>订单追踪 by：王小均 (优化版 - 增强复制功能)</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg-color: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-main: #1f2937;
+            --text-light: #6b7280;
+            --border-color: #e5e7eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --profit: #8b5cf6;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --audit-badge: #6366f1;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        
+        body { background-color: var(--bg-color); color: var(--text-main); height: 100vh; display: flex; overflow: hidden; }
+
+        /* --- 强制覆盖自动填充颜色（解决绿色/黄色背景框问题） --- */
+        input:-webkit-autofill,
+        input:-webkit-autofill:hover, 
+        input:-webkit-autofill:focus, 
+        textarea:-webkit-autofill,
+        textarea:-webkit-autofill:hover,
+        textarea:-webkit-autofill:focus,
+        select:-webkit-autofill,
+        select:-webkit-autofill:hover,
+        select:-webkit-autofill:focus {
+            -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+            -webkit-text-fill-color: #333 !important;
+            transition: background-color 5000s ease-in-out 0s;
+        }
+
+        /* Sidebar */
+        aside { width: 250px; background-color: #1e293b; color: white; display: flex; flex-direction: column; padding: 20px; flex-shrink: 0; }
+        .brand { font-size: 20px; font-weight: bold; margin-bottom: 30px; display: flex; align-items: center; gap: 10px; color: #fff; }
+        .nav-item { padding: 12px 15px; border-radius: 8px; cursor: pointer; transition: background 0.3s; margin-bottom: 5px; display: flex; align-items: center; gap: 10px; color: #94a3b8; font-size: 14px; }
+        .nav-item:hover, .nav-item.active { background-color: #334155; color: white; }
+        .nav-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; margin-top: 20px; margin-bottom: 10px; padding-left: 15px; font-weight: bold; }
+
+        /* Main Content */
+        main { flex: 1; padding: 30px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px; }
+        
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        h1 { font-size: 24px; font-weight: 600; }
+
+        /* Buttons & Inputs */
+        .btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+        .btn-primary { background-color: var(--primary-color); color: white; }
+        .btn-primary:hover { background-color: var(--primary-hover); }
+        .btn-success { background-color: var(--success); color: white; }
+        .btn-outline { background-color: transparent; border: 1px solid var(--border-color); color: var(--text-main); }
+        .btn-outline:hover { background-color: #f9fafb; }
+        .btn-sm { padding: 4px 8px; font-size: 12px; }
+        .btn-danger { color: var(--danger); border-color: #fee2e2; background: #fef2f2; }
+        .btn-danger:hover { background: #fee2e2; }
+        
+        input, select { padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 13px; outline: none; width: 100%; background-color: #fff; }
+        input:focus, select:focus { border-color: var(--primary-color); box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1); }
+        input[readonly] { background-color: #f3f4f6; color: #6b7280; border-color: transparent; }
+
+        /* Stats Cards & Filter */
+        .stats-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .stats-filter { display: flex; align-items: center; gap: 15px; background: white; padding: 10px 20px; border-radius: 8px; box-shadow: var(--shadow); }
+        
+        /* Toggle Switch */
+        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 24px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: var(--success); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 20px; } 
+        .card { background: var(--card-bg); padding: 20px; border-radius: 12px; box-shadow: var(--shadow); }
+        .stat-value { font-size: 24px; font-weight: bold; color: var(--text-main); margin-top: 5px; }
+        .stat-label { font-size: 13px; color: var(--text-light); }
+
+        /* Table */
+        .table-toolbar { display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center; }
+        .sort-controls { display: flex; gap: 10px; align-items: center; font-size: 14px; color: var(--text-light); }
+        .sort-controls select { width: auto; min-width: 120px; }
+
+        .table-container { background: var(--card-bg); border-radius: 12px; box-shadow: var(--shadow); overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--border-color); font-size: 13px; vertical-align: top; }
+        th { background-color: #f8fafc; font-weight: 600; color: var(--text-light); white-space: nowrap; }
+        tr:hover { background-color: #f9fafb; }
+
+        /* Status Badges */
+        .status-badge { display: inline-block; font-size: 11px; padding: 2px 6px; border-radius: 4px; margin-right: 4px; margin-bottom: 2px; border: 1px solid #e5e7eb; background: #f3f4f6; color: #666; }
+        .st-done { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
+        .st-pending { background: #f3f4f6; color: #4b5563; }
+        
+        .audit-badge {
+            display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 2px 8px; border-radius: 12px; font-weight: 600;
+        }
+        .audit-badge.audited { background-color: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; }
+        .audit-badge.unaudited { background-color: #f3f4f6; color: #6b7280; border: 1px solid #e5e7eb; }
+
+        /* Cost Specific Styles */
+        .cost-positive { color: var(--success); font-weight: bold; }
+        .cost-negative { color: var(--danger); font-weight: bold; }
+
+        /* Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal { background: white; width: 1100px; max-width: 95%; border-radius: 12px; padding: 25px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; }
+        .preview-modal { width: 800px; background: #fff; }
+        
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color); }
+        .form-section { margin-bottom: 20px; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; background: #fcfcfc; }
+        .section-title { font-weight: 600; color: var(--primary-color); margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; border-left: 4px solid var(--primary-color); padding-left: 10px; }
+
+        /* Grid Layouts in Form */
+        .row-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; }
+        .row-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+        .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; color: #374151; }
+
+        /* Dynamic Rows (Pricing & Material) */
+        .dynamic-row { display: grid; grid-template-columns: 2fr 1.5fr 0.8fr 0.8fr 1fr 30px; gap: 8px; margin-bottom: 10px; align-items: center; }
+        .material-row { display: grid; grid-template-columns: 1.8fr 1.2fr 1fr 0.8fr 0.8fr 1fr 30px; gap: 6px; margin-bottom: 10px; align-items: center; }
+        
+        .row-header { font-weight: bold; color: var(--text-light); font-size: 12px; margin-bottom: 5px; }
+
+        /* --- UPDATED: Process Grid Layout (Scientifically Optimized) --- */
+        /* Changed to Flex Column to allow proper Grid Rows inside */
+        .process-grid-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        /* Each row is a Grid */
+        .process-row {
+            display: grid;
+            /* Columns: Checkbox(40px) | Name(1fr) | Factory(1.5fr) | Cost(100px) */
+            grid-template-columns: 40px 1fr 1.5fr 100px;
+            gap: 10px;
+            align-items: center;
+            background: #fff;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            transition: border-color 0.2s;
+        }
+        .process-row:hover { border-color: var(--primary-color); }
+
+        /* Inputs inside the grid cells */
+        .factory-select {
+            width: 100%; /* Ensure full width to prevent text cut off */
+            min-width: 0; /* Allow shrinking but controlled by 1.5fr */
+            font-size: 12px;
+            height: 32px;
+            background-color: #fff; /* Force white */
+        }
+        
+        .process-cost {
+            width: 100%;
+            min-width: 80px;
+            text-align: right;
+            font-size: 13px;
+            color: var(--danger);
+            background: #fff5f5;
+            border-color: #fca5a5;
+            font-weight: 600;
+        }
+
+        /* Die Cut Group in Row */
+        .diecut-group {
+            display: flex;
+            flex-wrap: nowrap; /* Prevent wrapping causing vertical look */
+            align-items: center;
+            gap: 10px;
+            overflow: hidden;
+        }
+        .diecut-label {
+            font-weight: bold;
+            color: var(--text-main);
+            flex-shrink: 0;
+        }
+
+        /* Small Management Modal */
+        .small-modal { width: 450px; height: auto; }
+
+        /* Preview Specific Styles */
+        .preview-box { border: 1px solid #e5e7eb; padding: 20px; border-radius: 8px; margin-bottom: 15px; background: #fafafa; }
+        .preview-section { margin-bottom: 20px; }
+        .preview-title { font-weight: bold; border-bottom: 2px solid #eee; padding-bottom: 5px; margin-bottom: 10px; color: var(--text-main); }
+        .preview-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 13px; }
+        .preview-table th { background: #eee; border-bottom: 1px solid #ddd; padding: 8px; text-align: left; }
+        .preview-table td { border-bottom: 1px solid #eee; padding: 8px; }
+        .preview-summary { display: flex; justify-content: flex-end; gap: 20px; font-weight: bold; font-size: 15px; }
+        .tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 11px; border: 1px solid #ddd; margin-right: 5px; }
+        .tag.done { background: #dcfce7; border-color: #86efac; color: #166534; }
+        .tag.pending { background: #f3f4f6; border-color: #d1d5db; color: #374151; }
+
+        /* Toast */
+        #toast { visibility: hidden; min-width: 250px; background-color: #333; color: #fff; text-align: center; border-radius: 8px; padding: 16px; position: fixed; z-index: 2000; left: 50%; bottom: 30px; transform: translateX(-50%); font-size: 14px; }
+        #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
+        @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+
+        .hidden { display: none !important; }
+        .text-right { text-align: right; }
+        .spec-input { font-size: 12px; color: #555; background-color: #f9fafb; }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <aside>
+        <div class="brand">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+            个人订单
+        </div>
+        <nav>
+            <div class="nav-label">核心业务</div>
+            <div class="nav-item active" id="nav-orders" onclick="switchView('orders')">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                <span>订单列表</span>
+            </div>
+            <div class="nav-item" id="nav-cost" onclick="switchView('cost')">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                <span>成本统计</span>
+            </div>
+
+            <div class="nav-label">基础设置</div>
+            <div class="nav-item" id="nav-factory" onclick="openFactoryModal()">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 21h18M5 21V7l8-4 8 4v14M8 21v-2a2 2 0 0 1 4 0v2"/></svg>
+                <span>工厂管理</span>
+            </div>
+            <div class="nav-item" id="nav-material" onclick="openMaterialModal()">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                <span>材料库管理</span>
+            </div>
+            <div class="nav-item" onclick="openProcessModal()">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                <span>工序管理</span>
+            </div>
+            
+            <div class="nav-label">数据维护</div>
+            <div class="nav-item" onclick="exportData()">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>备份数据 (导出)</span>
+            </div>
+            <div class="nav-item" onclick="triggerImport()">
+                <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <span>恢复数据 (导入)</span>
+            </div>
+            <input type="file" id="fileInput" style="display: none;" onchange="importData(this)" accept=".json">
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main>
+        <!-- Order View -->
+        <div id="orders-view">
+            <header>
+                <h1>订单管理</h1>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn btn-primary" onclick="openModal()">+ 新建订单</button>
+                </div>
+            </header>
+
+            <!-- Stats Filter Toggle -->
+            <div class="stats-header">
+                <div class="stats-filter">
+                    <span style="font-weight:600; font-size:14px;">统计模式:</span>
+                    <label class="switch" title="开启后，仅统计【已审核】的订单">
+                        <input type="checkbox" id="auditFilterToggle" onchange="toggleAuditMode()">
+                        <span class="slider"></span>
+                    </label>
+                    <span id="auditModeLabel" style="font-size:13px; color:#666;">包含待审核数据</span>
+                    <span style="font-size:12px; color:#999; margin-left:10px;">(勾选右侧开关仅计入已审核流水)</span>
+                </div>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="card">
+                    <div class="stat-label">总订单数</div>
+                    <div class="stat-value" id="stat-total">0</div>
+                </div>
+                <div class="card">
+                    <div class="stat-label">总报价 (收入)</div>
+                    <div class="stat-value" id="stat-revenue" style="color: var(--primary-color)">0</div>
+                </div>
+                <div class="card">
+                    <div class="stat-label">总成本 (支出)</div>
+                    <div class="stat-value" id="stat-cost" style="color: var(--danger)">0</div>
+                </div>
+                <div class="card">
+                    <div class="stat-label">总毛利</div>
+                    <div class="stat-value" id="stat-profit" style="color: var(--profit)">0</div>
+                </div>
+                <div class="card">
+                    <div class="stat-label">待回款</div>
+                    <div class="stat-value" id="stat-unpaid" style="color: var(--warning)">0</div>
+                </div>
+                <div class="card">
+                    <div class="stat-label">生产中</div>
+                    <div class="stat-value" id="stat-active" style="color: var(--success)">0</div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 20px; padding: 0;">
+                <div style="padding: 15px; border-bottom: 1px solid var(--border-color);" class="table-toolbar">
+                    <span style="font-weight: 600; font-size: 15px;">当前订单列表</span>
+                    <div class="sort-controls">
+                        <span>排序:</span>
+                        <select id="sortSelect" onchange="handleSort()">
+                            <option value="time_desc">按下单时间 (新→旧)</option>
+                            <option value="time_asc">按下单时间 (旧→新)</option>
+                            <option value="amount_desc">按金额 (高→低)</option>
+                            <option value="client_asc">按客户名称 (A-Z)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="table-container" style="border: none; box-shadow: none; border-radius: 0;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>单号/日期</th>
+                                <th>客户/品类</th>
+                                <th>报价项目(名称)</th>
+                                <th>财务数据</th>
+                                <th>审核/状态</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="order-table-body">
+                            <!-- JS Renders Here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cost Statistics View -->
+        <div id="cost-view" class="hidden">
+            <header>
+                <h1>成本利润分析</h1>
+                <div id="cost-view-header-alert" style="font-size:13px; color:var(--warning); font-weight:bold;"></div>
+            </header>
+            <div class="card">
+                <div class="table-container" style="border:none; box-shadow:none;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>订单号</th>
+                                <th>客户</th>
+                                <th>报价(收)</th>
+                                <th>扣点(税/返)</th>
+                                <th>净收入</th>
+                                <th>材料成本</th>
+                                <th>加工成本</th>
+                                <th>打样快递</th>
+                                <th>总成本</th>
+                                <th>毛利</th>
+                                <th>利润率</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cost-table-body">
+                            <!-- JS Renders Here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Order Edit/Create Modal -->
+    <div class="modal-overlay" id="orderModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="modalTitle">新建订单</h2>
+                <button class="btn btn-outline" style="border:none;" onclick="closeModal('orderModal')">✕</button>
+            </div>
+            <form id="orderForm" onsubmit="handleFormSubmit(event)">
+                <input type="hidden" id="orderId">
+                
+                <!-- 1. Basic Info -->
+                <div class="form-section">
+                    <div class="section-title">基础信息</div>
+                    <div class="row-4">
+                        <div class="form-group">
+                            <label>客户名称</label>
+                            <input type="text" id="clientName" required placeholder="输入客户名称">
+                        </div>
+                        <div class="form-group">
+                            <label>订单品类</label>
+                            <select id="category" required onchange="renderProcessFormList()">
+                                <option value="setbox">套盒</option>
+                                <option value="cardbox">卡盒</option>
+                                <option value="book">书刊</option>
+                                <option value="adhesive">不干胶</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>下单时间</label>
+                            <input type="date" id="orderDate" required>
+                        </div>
+                         <div class="form-group">
+                            <label>审核状态</label>
+                            <div style="display:flex; align-items:center; height:38px;">
+                                <input type="checkbox" id="isAudited" style="width:auto; margin-right:8px;">
+                                <span style="font-size:13px; color:#555;">审核通过 (计入正确流水)</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row-3" style="margin-top: 15px;">
+                         <div class="form-group">
+                            <label>预计出货时间</label>
+                            <input type="date" id="deliveryDate">
+                        </div>
+                        <div class="form-group">
+                            <label>回款状态</label>
+                            <select id="paymentStatus">
+                                <option value="unpaid">未回款</option>
+                                <option value="partial">部分回款</option>
+                                <option value="paid">已回款</option>
+                            </select>
+                        </div>
+                         <div class="form-group">
+                            <!-- Empty filler for alignment -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Financials -->
+                <div class="form-section" style="background: #fffbeb; border-color: #fcd34d;">
+                    <div class="section-title" style="color: #b45309; border-color: #f59e0b;">
+                        <span>财务设置 (扣点与费用)</span>
+                    </div>
+                    <div class="row-4">
+                        <div class="form-group">
+                            <label>打样、快递费 (元)</label>
+                            <input type="number" id="otherCost" placeholder="0.00" min="0" step="0.01" oninput="updateFinancialPreview()">
+                        </div>
+                        <div class="form-group">
+                            <label>退款税点 (%)</label>
+                            <input type="number" id="taxRate" placeholder="如: 1" min="0" step="0.1" oninput="updateFinancialPreview()">
+                        </div>
+                        <div class="form-group">
+                            <label>客户返点 (%)</label>
+                            <input type="number" id="rebateRate" placeholder="如: 2" min="0" step="0.1" oninput="updateFinancialPreview()">
+                        </div>
+                        <div class="form-group" style="text-align:right; padding-top:20px;">
+                            <label>当前预估扣款:</label>
+                            <span id="deductionPreview" style="font-size:16px; font-weight:bold; color:#b45309;">¥0.00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Quoting (Revenue) -->
+                <div class="form-section">
+                    <div class="section-title">
+                        <span>报价明细 (客户需付金额)</span>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="addPriceItem()">+ 添加项目</button>
+                    </div>
+                    <div class="dynamic-row row-header">
+                        <span>项目名称</span><span>尺寸规格</span><span>数量</span><span>单价</span><span>小计</span><span></span>
+                    </div>
+                    <div id="price-items-container"></div>
+                    <div class="text-right" style="margin-top: 15px; font-size: 18px; font-weight: bold; color: var(--primary-color);">
+                        报价总计: <span id="form-total-price">0.00</span> 元
+                    </div>
+                </div>
+
+                <!-- 4. Materials (Cost) -->
+                <div class="form-section" style="background: #eff6ff; border-color: #bfdbfe;">
+                    <div class="section-title" style="color: #1d4ed8; border-color: #1d4ed8;">
+                        <span>订材料追踪 (成本支出)</span>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="addMaterialItem()">+ 添加材料</button>
+                    </div>
+                    <div class="material-row row-header">
+                        <span>材质名称</span><span>尺寸规格</span><span>供应商</span><span>数量</span><span>单位</span><span>金额</span><span></span>
+                    </div>
+                    <div id="materials-container"></div>
+                    <div class="text-right" style="margin-top: 10px; font-size: 14px; color: var(--danger);">
+                        材料总成本: <span id="form-material-total">0.00</span> 元
+                    </div>
+                </div>
+
+                <!-- 5. Process Tracking (Cost) -->
+                <div class="form-section">
+                    <div class="section-title">
+                        <span>生产流程追踪 (含加工成本)</span>
+                        <span style="font-size:12px; font-weight:400; color:#6b7280;">已优化为弹性布局，文字横向完整显示</span>
+                    </div>
+                    <div class="process-grid-container" id="process-list-container">
+                        <!-- JS Dynamically fills this -->
+                    </div>
+                </div>
+
+                <div class="text-right" style="margin-top: 20px;">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('orderModal')">取消</button>
+                    <button type="submit" class="btn btn-primary">保存订单</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- NEW: Order Preview Modal -->
+    <div class="modal-overlay" id="previewModal">
+        <div class="modal preview-modal">
+            <div class="modal-header">
+                <h2>工单预览</h2>
+                <button class="btn btn-outline" style="border:none;" onclick="closeModal('previewModal')">✕</button>
+            </div>
+            <div id="preview-content">
+                <!-- Content Injected via JS -->
+            </div>
+            <div class="text-right" style="margin-top: 20px;">
+                <button type="button" class="btn btn-primary" onclick="closeModal('previewModal')">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Factory Management Modal -->
+    <div class="modal-overlay" id="factoryModal">
+        <div class="modal small-modal">
+            <div class="modal-header">
+                <h2>工厂/供应商管理</h2>
+                <button class="btn btn-outline" style="border:none;" onclick="closeModal('factoryModal')">✕</button>
+            </div>
+            <div style="margin-bottom: 10px; display: flex; gap: 10px;">
+                <input type="text" id="newFactoryName" placeholder="输入工厂名称...">
+                <button class="btn btn-primary" onclick="addFactory()">添加</button>
+            </div>
+            <ul id="factory-list" style="list-style: none; max-height: 300px; overflow-y: auto;"></ul>
+        </div>
+    </div>
+
+    <!-- Material Library Modal -->
+    <div class="modal-overlay" id="materialModal">
+        <div class="modal small-modal">
+            <div class="modal-header">
+                <h2>材料库管理</h2>
+                <button class="btn btn-outline" style="border:none;" onclick="closeModal('materialModal')">✕</button>
+            </div>
+            <div style="margin-bottom: 10px; display: flex; gap: 10px;">
+                <input type="text" id="newMaterialName" placeholder="输入材质名称 (如: 300g灰底白)">
+                <button class="btn btn-primary" onclick="addMaterial()">添加</button>
+            </div>
+            <ul id="material-list" style="list-style: none; max-height: 300px; overflow-y: auto;"></ul>
+        </div>
+    </div>
+
+    <!-- Process Management Modal -->
+    <div class="modal-overlay" id="processModal">
+        <div class="modal small-modal">
+            <div class="modal-header">
+                <h2>工序名称管理</h2>
+                <button class="btn btn-outline" style="border:none;" onclick="closeModal('processModal')">✕</button>
+            </div>
+            <div style="margin-bottom: 10px; display: flex; gap: 10px;">
+                <input type="text" id="newProcessName" placeholder="输入工序名称 (如: 模切)">
+                <button class="btn btn-primary" onclick="addProcess()">添加</button>
+            </div>
+            <ul id="process-list-manage" style="list-style: none; max-height: 300px; overflow-y: auto;"></ul>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast">操作成功</div>
+
+    <script>
+        // --- Data Store ---
+        let orders = JSON.parse(localStorage.getItem('printOrders_v8')) || [];
+        let factories = JSON.parse(localStorage.getItem('printFactories_v8')) || ['自厂', '外协A', '辉煌纸品', '精艺印刷'];
+        let materials = JSON.parse(localStorage.getItem('printMaterials_v8')) || ['300g灰底白板', '157g铜版纸', '牛皮纸', '瓦楞纸'];
+        let customProcesses = JSON.parse(localStorage.getItem('printCustomProcesses_v8')) || []; 
+        let strictAuditMode = JSON.parse(localStorage.getItem('printAuditMode_v8')) || false; // Global Setting
+
+        // Defined standard processes
+        const standardProcessKeys = ['printing', 'laminating', 'uv_printing', 'hotstamping', 'embossing', 'pasting', 'mounting', 'manual', 'forming'];
+        const standardProcessLabels = {
+            'printing': '印刷', 'laminating': '过胶', 'uv_printing': '丝印UV', 
+            'hotstamping': '烫金', 'embossing': '击凸', 'pasting': '粘', 
+            'mounting': '裱', 'manual': '手工', 'forming': '成型'
+        };
+
+        // Mandatory tracking items
+        const mandatoryProcessKeys = ['coding', 'full_inspection', 'logistics'];
+        const mandatoryProcessLabels = {
+            'coding': '喷码',
+            'full_inspection': '全检',
+            'logistics': '物流费'
+        };
+
+        // Die Cutting Logic
+        const dieCutConfig = {
+            default: { key: 'die_cutting', label: '模切' },
+            cardbox: { key: 'die_cutting', label: '模切' } // Same key, but different rendering
+        };
+
+        const categoryLabels = {'setbox': '套盒', 'cardbox': '卡盒', 'book': '书刊', 'adhesive': '不干胶'};
+        const paymentLabels = {
+            'unpaid': { text: '未回款', class: 'pay-unpaid' },
+            'partial': { text: '部分回款', class: 'pay-partial' },
+            'paid': { text: '已回款', class: 'pay-paid' }
+        };
+
+        // --- Init ---
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('orderDate').valueAsDate = new Date();
+            
+            const auditToggle = document.getElementById('auditFilterToggle');
+            auditToggle.checked = strictAuditMode;
+            updateAuditLabel();
+
+            const priceContainer = document.getElementById('price-items-container');
+            priceContainer.addEventListener('input', calculateTotal);
+            
+            const materialContainer = document.getElementById('materials-container');
+            materialContainer.addEventListener('input', calculateMaterialTotal);
+
+            renderFactoryOptions();
+            renderMaterialOptions();
+            renderProcessFormList(); 
+            renderTable();
+            updateStats();
+            addPriceItem(); 
+            addMaterialItem();
+        });
+
+        function updateAuditLabel() {
+            const label = document.getElementById('auditModeLabel');
+            if(strictAuditMode) {
+                label.textContent = "仅统计已审核";
+                label.style.color = "var(--audit-badge)";
+                label.style.fontWeight = "bold";
+            } else {
+                label.textContent = "包含待审核数据";
+                label.style.color = "#666";
+                label.style.fontWeight = "normal";
+            }
+        }
+
+        function toggleAuditMode() {
+            strictAuditMode = document.getElementById('auditFilterToggle').checked;
+            localStorage.setItem('printAuditMode_v8', JSON.stringify(strictAuditMode));
+            updateAuditLabel();
+            renderTable(); 
+            updateStats(); 
+            if(document.getElementById('cost-view').style.display !== 'none') {
+                renderCostTable();
+            }
+            showToast(strictAuditMode ? "已切换：仅统计已审核订单" : "已切换：统计全部订单");
+        }
+
+        // --- View Switching ---
+        function switchView(viewName) {
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById('orders-view').classList.add('hidden');
+            document.getElementById('cost-view').classList.add('hidden');
+
+            if(viewName === 'orders') {
+                document.getElementById('nav-orders').classList.add('active');
+                document.getElementById('orders-view').classList.remove('hidden');
+                renderTable();
+            } else if(viewName === 'cost') {
+                document.getElementById('nav-cost').classList.add('active');
+                document.getElementById('cost-view').classList.remove('hidden');
+                renderCostTable();
+            }
+        }
+
+        // --- Factories ---
+        function openFactoryModal() {
+            document.getElementById('factoryModal').style.display = 'flex';
+            renderFactoryList();
+        }
+        function renderFactoryList() {
+            const list = document.getElementById('factory-list');
+            list.innerHTML = '';
+            factories.forEach((f, i) => {
+                const li = document.createElement('li');
+                li.style.cssText = 'padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;';
+                li.innerHTML = `<span>${f}</span> <button class="btn btn-sm btn-danger" onclick="removeItem('factories', ${i})">删除</button>`;
+                list.appendChild(li);
+            });
+        }
+        function addFactory() {
+            const name = document.getElementById('newFactoryName').value.trim();
+            if(name) {
+                factories.push(name);
+                saveSettings(); renderFactoryList(); renderFactoryOptions(); showToast("工厂已添加");
+                document.getElementById('newFactoryName').value = '';
+            }
+        }
+        function renderFactoryOptions() {
+            const selects = document.querySelectorAll('.factory-select, .material-factory-select');
+            selects.forEach(select => {
+                const currentVal = select.value;
+                select.innerHTML = '<option value="">未选择</option>';
+                factories.forEach(f => {
+                    const opt = document.createElement('option');
+                    opt.value = f; opt.textContent = f;
+                    select.appendChild(opt);
+                });
+                if(currentVal) select.value = currentVal;
+            });
+        }
+
+        // --- Materials ---
+        function openMaterialModal() {
+            document.getElementById('materialModal').style.display = 'flex';
+            renderMaterialList();
+        }
+        function renderMaterialList() {
+            const list = document.getElementById('material-list');
+            list.innerHTML = '';
+            materials.forEach((m, i) => {
+                const li = document.createElement('li');
+                li.style.cssText = 'padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;';
+                li.innerHTML = `<span>${m}</span> <button class="btn btn-sm btn-danger" onclick="removeItem('materials', ${i})">删除</button>`;
+                list.appendChild(li);
+            });
+        }
+        function addMaterial() {
+            const name = document.getElementById('newMaterialName').value.trim();
+            if(name) {
+                materials.push(name);
+                saveSettings(); renderMaterialList(); renderMaterialOptions(); showToast("材料已添加");
+                document.getElementById('newMaterialName').value = '';
+            }
+        }
+        function renderMaterialOptions() {
+            const inputs = document.querySelectorAll('.material-name-select');
+            inputs.forEach(input => {
+                const currentVal = input.value;
+                input.innerHTML = '<option value="">选择或输入...</option>';
+                materials.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m; opt.textContent = m;
+                    input.appendChild(opt);
+                });
+                if(currentVal) input.value = currentVal;
+            });
+        }
+        function removeItem(type, index) {
+            if(confirm('确认删除？')) {
+                if(type === 'factories') factories.splice(index, 1);
+                if(type === 'materials') materials.splice(index, 1);
+                saveSettings();
+                if(type === 'factories') { renderFactoryList(); renderFactoryOptions(); }
+                if(type === 'materials') { renderMaterialList(); renderMaterialOptions(); }
+            }
+        }
+
+        // --- Processes ---
+        function openProcessModal() {
+            document.getElementById('processModal').style.display = 'flex';
+            renderProcessManageList();
+        }
+        
+        function getProcessLabels() {
+            let labels = { ...standardProcessLabels };
+            customProcesses.forEach(p => labels[p.id] = p.name);
+            Object.keys(mandatoryProcessLabels).forEach(k => labels[k] = mandatoryProcessLabels[k]);
+            labels['die_cutting'] = '模切';
+            return labels;
+        }
+
+        function renderProcessManageList() {
+            const list = document.getElementById('process-list-manage');
+            list.innerHTML = '';
+            
+            Object.keys(standardProcessLabels).forEach(key => {
+                const li = document.createElement('li');
+                li.style.cssText = 'padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; color:#666;';
+                li.innerHTML = `<span>${standardProcessLabels[key]}</span> <span style="font-size:11px; border:1px solid #ddd; padding:2px 4px; border-radius:3px;">系统默认</span>`;
+                list.appendChild(li);
+            });
+
+            Object.keys(mandatoryProcessLabels).forEach(key => {
+                const li = document.createElement('li');
+                li.style.cssText = 'padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; color:#666;';
+                li.innerHTML = `<span>${mandatoryProcessLabels[key]}</span> <span style="font-size:11px; border:1px solid #ddd; padding:2px 4px; border-radius:3px;">系统强制</span>`;
+                list.appendChild(li);
+            });
+
+            const dieLi = document.createElement('li');
+            dieLi.style.cssText = 'padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; color:#666;';
+            dieLi.innerHTML = `<span>模切 (卡盒自动拆分)</span> <span style="font-size:11px; border:1px solid #ddd; padding:2px 4px; border-radius:3px;">智能判断</span>`;
+            list.appendChild(dieLi);
+
+            customProcesses.forEach((p, i) => {
+                const li = document.createElement('li');
+                li.style.cssText = 'padding:10px; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center;';
+                li.innerHTML = `<span>${p.name}</span> <button class="btn btn-sm btn-danger" onclick="removeCustomProcess(${i})">删除</button>`;
+                list.appendChild(li);
+            });
+        }
+        function addProcess() {
+            const name = document.getElementById('newProcessName').value.trim();
+            if(name) {
+                const id = 'custom_' + Date.now();
+                customProcesses.push({ id, name });
+                saveSettings(); renderProcessManageList(); showToast("工序已添加");
+                document.getElementById('newProcessName').value = '';
+            }
+        }
+        function removeCustomProcess(index) {
+            if(confirm('确认删除？')) {
+                customProcesses.splice(index, 1);
+                saveSettings(); renderProcessManageList();
+            }
+        }
+
+        // --- CORE LOGIC: Render Process List (OPTIMIZED GRID LAYOUT) ---
+        function renderProcessFormList() {
+            const container = document.getElementById('process-list-container');
+            container.innerHTML = '';
+            
+            const category = document.getElementById('category').value;
+            const labels = getProcessLabels();
+
+            // 1. Standard Processes
+            standardProcessKeys.forEach(key => {
+                createProcessCell(container, key, labels[key] || key, false);
+            });
+
+            // 2. Die Cutting Logic (Standard vs Merged)
+            if (category === 'cardbox') {
+                createProcessCell(container, dieCutConfig.cardbox.key, dieCutConfig.cardbox.label, true);
+            } else {
+                createProcessCell(container, dieCutConfig.default.key, dieCutConfig.default.label, false);
+            }
+
+            // 3. Mandatory Processes
+            mandatoryProcessKeys.forEach(key => {
+                createProcessCell(container, key, mandatoryProcessLabels[key], false);
+            });
+
+            // 4. Custom Processes
+            customProcesses.forEach(p => {
+                createProcessCell(container, p.id, p.name, false);
+            });
+
+            renderFactoryOptions();
+        }
+
+        // OPTIMIZED: Creates a div-based Grid Row instead of broken tr/td
+        function createProcessCell(container, key, label, isMergedDieCut) {
+            const row = document.createElement('div');
+            row.className = 'process-row';
+
+            let col1HTML = '';
+            if (isMergedDieCut) {
+                col1HTML = `<div></div>`; // Empty checkbox column
+            } else {
+                col1HTML = `<div style="text-align:center;"><input type="checkbox" class="process-check" data-process="${key}" id="chk_${key}"></div>`;
+            }
+
+            let col2HTML = '';
+            if (isMergedDieCut) {
+                col2HTML = `
+                    <div class="diecut-group">
+                        <span class="diecut-label">${label}</span>
+                        <span style="border-left:1px solid #ddd; height:16px; margin:0 8px;"></span>
+                        <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-size:12px; white-space:nowrap;">
+                            <input type="checkbox" id="chk_die_inner" class="die-cut-sub" data-type="inner"> 内托
+                        </label>
+                        <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-size:12px; white-space:nowrap;">
+                            <input type="checkbox" id="chk_die_card" class="die-cut-sub" data-type="card"> 卡盒
+                        </label>
+                    </div>
+                `;
+            } else {
+                col2HTML = `<span class="process-name-col" style="font-size:13px;">${label}</span>`;
+            }
+
+            // Layout: Checkbox | Name | Factory Select | Cost Input
+            row.innerHTML = `
+                ${col1HTML}
+                <div>${col2HTML}</div>
+                <div>
+                    <select class="factory-select" data-process="${key}"></select>
+                </div>
+                <div>
+                    <input type="number" class="process-cost" data-process="${key}" placeholder="0.00" min="0" step="0.01">
+                </div>
+            `;
+            container.appendChild(row);
+        }
+
+        // --- Modal Logic ---
+        function openModal(orderId = null) {
+            const modal = document.getElementById('orderModal');
+            const title = document.getElementById('modalTitle');
+            const form = document.getElementById('orderForm');
+            
+            modal.style.display = 'flex';
+            document.getElementById('price-items-container').innerHTML = '';
+            document.getElementById('materials-container').innerHTML = '';
+            
+            // Clear inputs
+            document.querySelectorAll('.process-check, .die-cut-sub').forEach(c => c.checked = false);
+            document.querySelectorAll('.factory-select').forEach(s => s.value = '');
+            document.querySelectorAll('.process-cost').forEach(c => c.value = '');
+            document.getElementById('otherCost').value = 0;
+            document.getElementById('taxRate').value = 0;
+            document.getElementById('rebateRate').value = 0;
+            document.getElementById('isAudited').checked = false; 
+
+            if (orderId) {
+                const order = orders.find(o => o.id === orderId);
+                title.textContent = '编辑订单 - ' + orderId;
+                document.getElementById('orderId').value = order.id;
+                document.getElementById('clientName').value = order.client;
+                document.getElementById('category').value = order.category;
+                document.getElementById('paymentStatus').value = order.paymentStatus || 'unpaid';
+                document.getElementById('orderDate').value = order.orderDate;
+                document.getElementById('deliveryDate').value = order.deliveryDate || '';
+                document.getElementById('isAudited').checked = !!order.isAudited;
+                
+                document.getElementById('otherCost').value = order.otherCost || 0;
+                document.getElementById('taxRate').value = order.taxRate || 0;
+                document.getElementById('rebateRate').value = order.rebateRate || 0;
+                
+                order.items.forEach(item => addPriceItem(item));
+                order.materials.forEach(mat => addMaterialItem(mat));
+                
+                // Render Process List first based on category
+                renderProcessFormList();
+
+                // Load Process Values
+                Object.keys(order.process || {}).forEach(key => {
+                    // Standard process loading
+                    const checkbox = document.querySelector(`.process-check[data-process="${key}"]`);
+                    const select = document.querySelector(`.factory-select[data-process="${key}"]`);
+                    const costInput = document.querySelector(`.process-cost[data-process="${key}"]`);
+                    
+                    if(checkbox) checkbox.checked = order.process[key].done;
+                    if(select) select.value = order.process[key].factory;
+                    if(costInput) costInput.value = order.process[key].cost || 0;
+
+                    // Special Loading for Die Cut (Cardbox)
+                    if (key === 'die_cutting' && document.getElementById('category').value === 'cardbox') {
+                        // Look for merged structure first: { done_inner, done_card }
+                        if (order.process[key].hasOwnProperty('done_inner')) {
+                             document.getElementById('chk_die_inner').checked = order.process[key].done_inner;
+                             document.getElementById('chk_die_card').checked = order.process[key].done_card;
+                             if(select) select.value = order.process[key].factory;
+                             if(costInput) costInput.value = order.process[key].cost || 0;
+                        } 
+                        // Backward compatibility
+                        else if (order.process['die_cut_inner'] && order.process['die_cut_card']) {
+                             document.getElementById('chk_die_inner').checked = order.process['die_cut_inner'].done;
+                             document.getElementById('chk_die_card').checked = order.process['die_cut_card'].done;
+                        }
+                    }
+                });
+
+            } else {
+                title.textContent = '新建订单';
+                document.getElementById('orderId').value = '';
+                document.getElementById('clientName').value = '';
+                document.getElementById('category').value = 'setbox';
+                document.getElementById('paymentStatus').value = 'unpaid';
+                document.getElementById('orderDate').valueAsDate = new Date();
+                document.getElementById('deliveryDate').value = '';
+                document.getElementById('otherCost').value = 0;
+                document.getElementById('taxRate').value = 0;
+                document.getElementById('rebateRate').value = 0;
+                
+                renderProcessFormList();
+                
+                addPriceItem(); 
+                addMaterialItem();
+            }
+            calculateTotal();
+            calculateMaterialTotal();
+            updateFinancialPreview();
+        }
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+
+        // --- Copy Order Logic (NEW) ---
+        function copyOrder(id) {
+            const originalOrder = orders.find(o => o.id === id);
+            if (!originalOrder) return;
+
+            // 1. Deep clone to avoid reference issues
+            const newOrder = JSON.parse(JSON.stringify(originalOrder));
+
+            // 2. Generate a unique new ID based on current logic
+            const clientName = newOrder.client;
+            const orderDateStr = new Date().toISOString().slice(0, 10); // Today's date YYYY-MM-DD
+            const shortDate = orderDateStr.replace(/-/g, '').substring(2); // YYMMDD
+            
+            const firstChar = clientName ? clientName.charAt(0).toUpperCase() : 'X';
+            let baseId = firstChar + shortDate;
+            
+            let counter = 1;
+            let newId = baseId;
+            while(orders.find(o => o.id === newId)) {
+                newId = baseId + counter;
+                counter++;
+            }
+            newOrder.id = newId;
+
+            // 3. Reset fields specific to a new order
+            newOrder.orderDate = orderDateStr; // Set to today
+            newOrder.isAudited = false; // Reset audit status
+            newOrder.updatedAt = new Date().toISOString();
+            
+            // Optional: Clear payment status or delivery date if preferred
+            // newOrder.deliveryDate = ''; 
+            // newOrder.paymentStatus = 'unpaid';
+
+            // 4. Add to orders array (unshift puts it at the top)
+            orders.unshift(newOrder);
+            
+            // 5. Persist and Update UI
+            localStorage.setItem('printOrders_v8', JSON.stringify(orders));
+            renderTable();
+            updateStats();
+            showToast(`订单已复制: ${newId}`);
+        }
+
+        // --- Preview Logic ---
+        function previewOrder(id) {
+            const order = orders.find(o => o.id === id);
+            if(!order) return;
+
+            const fin = getOrderFinancials(order);
+            const labels = getProcessLabels();
+            const container = document.getElementById('preview-content');
+            
+            let processHTML = '';
+            Object.keys(order.process || {}).forEach(key => {
+                // Skip old separate keys if merged exists
+                if (key === 'die_cut_inner' || key === 'die_cut_card') {
+                    if (order.process['die_cutting']) return; 
+                }
+
+                const p = order.process[key];
+                let statusText = '';
+                
+                // Handle display for Merged Die Cut
+                if (key === 'die_cutting' && (p.hasOwnProperty('done_inner') || p.hasOwnProperty('done_card'))) {
+                    const innerState = p.done_inner ? '✓' : '○';
+                    const cardState = p.done_card ? '✓' : '○';
+                    statusText = `内托[${innerState}] 卡盒[${cardState}]`;
+                } else {
+                    statusText = p.done ? '已完成' : '进行中';
+                }
+
+                const cls = p.done ? 'done' : 'pending';
+                const factoryText = p.factory ? `(${p.factory})` : '';
+                const costText = p.cost > 0 ? ` <span style="color:#ef4444">¥${p.cost}</span>` : '';
+                
+                // Use label logic
+                let displayName = labels[key] || key;
+                if (key === 'die_cutting' && order.category === 'cardbox') displayName = '模切';
+
+                processHTML += `<span class="tag ${cls}">${displayName}: ${statusText}${factoryText}${costText}</span>`;
+            });
+
+            let itemsHTML = '';
+            order.items.forEach(item => {
+                itemsHTML += `<tr>
+                    <td>${item.name} <span style="color:#999; font-size:11px;">${item.spec || ''}</span></td>
+                    <td style="text-align:center">${item.qty}</td>
+                    <td style="text-align:right">¥${item.price.toFixed(2)}</td>
+                    <td style="text-align:right">¥${(item.qty * item.price).toFixed(2)}</td>
+                </tr>`;
+            });
+
+            let matHTML = '';
+            order.materials.forEach(m => {
+                matHTML += `<tr>
+                    <td>${m.name} <span style="color:#999; font-size:11px;">${m.spec || ''}</span></td>
+                    <td>${m.factory || '-'}</td>
+                    <td style="text-align:center">${m.qty || 0} ${m.unit || ''}</td>
+                    <td style="text-align:right">¥${m.cost.toFixed(2)}</td>
+                </tr>`;
+            });
+
+            const html = `
+                <div class="preview-box">
+                    <h3 style="margin-bottom:10px; color:var(--primary-color)">订单基础信息</h3>
+                    <p><strong>单号：</strong> ${order.id}</p>
+                    <p><strong>客户：</strong> ${order.client} &nbsp;&nbsp; <strong>品类：</strong> ${categoryLabels[order.category]}</p>
+                    <p><strong>下单日期：</strong> ${order.orderDate} &nbsp;&nbsp; <strong>预计出货：</strong> ${order.deliveryDate || '未定'}</p>
+                    <p><strong>审核状态：</strong> ${order.isAudited ? '<span style="color:var(--success);font-weight:bold;">已审核</span>' : '<span style="color:#999;">待审核</span>'}</p>
+                    <p><strong>回款状态：</strong> ${paymentLabels[order.paymentStatus].text}</p>
+                </div>
+
+                <div class="preview-section">
+                    <div class="preview-title">报价明细 (含规格)</div>
+                    <table class="preview-table">
+                        <thead><tr><th>项目/规格</th><th style="text-align:center">数量</th><th style="text-align:right">单价</th><th style="text-align:right">小计</th></tr></thead>
+                        <tbody>${itemsHTML}</tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="3" style="text-align:right; font-weight:bold;">报价总额：</td>
+                                <td style="text-align:right; color:var(--primary-color); font-weight:bold;">¥${fin.grossPrice.toFixed(2)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <div class="preview-section">
+                    <div class="preview-title">生产与成本</div>
+                    
+                    <div style="margin-bottom:15px;">
+                        <div style="font-weight:bold; margin-bottom:5px; font-size:12px;">工序进度：</div>
+                        <div style="line-height:1.8;">${processHTML || '<span style="color:#999">暂无工序记录</span>'}</div>
+                    </div>
+
+                    <table class="preview-table">
+                        <thead><tr><th>材料/规格</th><th>供应商</th><th style="text-align:center">数量/单位</th><th style="text-align:right">成本</th></tr></thead>
+                        <tbody>${matHTML || '<tr><td colspan="4" style="text-align:center; color:#999">无材料记录</td></tr>'}</tbody>
+                    </table>
+                    
+                    <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:13px; color:#666;">
+                        <span>税点扣除：${order.taxRate || 0}% (¥${fin.taxAmt.toFixed(2)})</span>
+                        <span>返点扣除：${order.rebateRate || 0}% (¥${fin.rebateAmt.toFixed(2)})</span>
+                        <span>其他杂费：¥${fin.other.toFixed(2)}</span>
+                    </div>
+                </div>
+
+                <div class="preview-section" style="background:#f8fafc; padding:15px; border-radius:8px;">
+                    <div class="preview-title">财务核算</div>
+                    <div class="preview-summary">
+                        <div style="color:var(--primary-color)">净收入: ¥${fin.netRevenue.toFixed(2)}</div>
+                        <div style="color:var(--danger)">总成本: ¥${fin.totalCost.toFixed(2)}</div>
+                        <div style="color:${fin.profit >= 0 ? 'var(--profit)' : 'var(--danger)'}">毛利: ¥${fin.profit.toFixed(2)}</div>
+                    </div>
+                </div>
+            `;
+
+            container.innerHTML = html;
+            document.getElementById('previewModal').style.display = 'flex';
+        }
+
+        // --- Dynamic Rows ---
+        function addPriceItem(data = null) {
+            const container = document.getElementById('price-items-container');
+            const row = document.createElement('div');
+            row.className = 'dynamic-row';
+            
+            const nameVal = data ? data.name : '';
+            const specVal = data ? data.spec : '';
+            const qtyVal = data ? data.qty : '';
+            const priceVal = data ? data.price : '';
+
+            row.innerHTML = `
+                <input type="text" placeholder="项目名称" class="item-name" value="${nameVal}" required>
+                <input type="text" placeholder="尺寸规格" class="item-spec" value="${specVal}">
+                <input type="number" placeholder="数量" class="item-qty" value="${qtyVal}" min="1" required>
+                <input type="number" placeholder="单价" class="item-price" value="${priceVal}" min="0" step="0.01" required>
+                <span class="item-subtotal">0.00</span>
+                <button type="button" class="btn btn-sm btn-danger" onclick="this.parentElement.remove(); calculateTotal()">✕</button>
+            `;
+            container.appendChild(row);
+            calculateTotal();
+        }
+
+        function addMaterialItem(data = null) {
+            const container = document.getElementById('materials-container');
+            const row = document.createElement('div');
+            row.className = 'material-row';
+            
+            const matName = data ? data.name : '';
+            const matSpec = data ? data.spec : '';
+            const matFactory = data ? data.factory : '';
+            const matQty = data ? data.qty : '';
+            const matCost = data ? data.cost : '';
+
+            row.innerHTML = `
+                <select class="material-name-select">
+                    <option value="">选择材质...</option>
+                    ${materials.map(m => `<option value="${m}">${m}</option>`).join('')}
+                </select>
+                <input type="text" placeholder="尺寸规格" class="mat-spec" value="${matSpec}">
+                <select class="material-factory-select">
+                    <option value="">工厂...</option>
+                    ${factories.map(f => `<option value="${f}">${f}</option>`).join('')}
+                </select>
+                <input type="number" placeholder="数量" class="mat-qty" value="${matQty}" min="0">
+                <input type="text" placeholder="单位" class="mat-unit" value="${data?data.unit:'张'}" list="unit-list">
+                <input type="number" placeholder="金额" class="mat-cost" value="${matCost}" min="0" step="0.01">
+                <button type="button" class="btn btn-sm btn-danger" onclick="this.parentElement.remove(); calculateMaterialTotal()">✕</button>
+            `;
+            container.appendChild(row);
+            
+            if(data) {
+                row.querySelector('.material-name-select').value = matName;
+                row.querySelector('.material-factory-select').value = matFactory;
+            }
+            calculateMaterialTotal();
+        }
+
+        // --- Calculations ---
+        function calculateTotal() {
+            let total = 0;
+            const rows = document.querySelectorAll('.dynamic-row');
+            rows.forEach(row => {
+                const qtyInput = row.querySelector('.item-qty');
+                const priceInput = row.querySelector('.item-price');
+                const subOutput = row.querySelector('.item-subtotal');
+
+                if(qtyInput && priceInput && subOutput) {
+                    const qty = parseFloat(qtyInput.value) || 0;
+                    const price = parseFloat(priceInput.value) || 0;
+                    const sub = qty * price;
+                    subOutput.textContent = sub.toFixed(2);
+                    total += sub;
+                }
+            });
+            const totalDisplay = document.getElementById('form-total-price');
+            if(totalDisplay) totalDisplay.textContent = total.toFixed(2);
+            updateFinancialPreview(); 
+            return total;
+        }
+
+        function calculateMaterialTotal() {
+            let total = 0;
+            const rows = document.querySelectorAll('.material-row');
+            rows.forEach(row => {
+                const costInput = row.querySelector('.mat-cost');
+                if(costInput) {
+                    const cost = parseFloat(costInput.value) || 0;
+                    total += cost;
+                }
+            });
+            const totalDisplay = document.getElementById('form-material-total');
+            if(totalDisplay) totalDisplay.textContent = total.toFixed(2);
+            return total;
+        }
+
+        function updateFinancialPreview() {
+            const priceEl = document.getElementById('form-total-price');
+            const taxEl = document.getElementById('taxRate');
+            const rebateEl = document.getElementById('rebateRate');
+            const deductionEl = document.getElementById('deductionPreview');
+
+            if(!priceEl || !taxEl || !rebateEl || !deductionEl) return;
+
+            const price = parseFloat(priceEl.textContent) || 0;
+            const tax = parseFloat(taxEl.value) || 0;
+            const rebate = parseFloat(rebateEl.value) || 0;
+            
+            const deduction = price * ((tax + rebate) / 100);
+            deductionEl.textContent = "-¥" + deduction.toFixed(2);
+        }
+
+        // --- Save Settings ---
+        function saveSettings() {
+            localStorage.setItem('printFactories_v8', JSON.stringify(factories));
+            localStorage.setItem('printMaterials_v8', JSON.stringify(materials));
+            localStorage.setItem('printCustomProcesses_v8', JSON.stringify(customProcesses));
+        }
+
+        // --- Save Data ---
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            showToast("正在保存...");
+
+            try {
+                let id = document.getElementById('orderId').value;
+                const isNew = !id;
+
+                // --- LOGIC UPDATE: Generate ID for New Orders ---
+                if (isNew) {
+                    const clientName = document.getElementById('clientName').value.trim();
+                    const orderDateStr = document.getElementById('orderDate').value; // YYYY-MM-DD
+                    const shortDate = orderDateStr.replace(/-/g, '').substring(2); // YYMMDD (e.g., 260120)
+                    
+                    // Get first character (Chinese or English)
+                    const firstChar = clientName ? clientName.charAt(0).toUpperCase() : 'X';
+                    
+                    let baseId = firstChar + shortDate;
+                    
+                    // Ensure uniqueness
+                    let counter = 1;
+                    id = baseId;
+                    while(orders.find(o => o.id === id)) {
+                        id = baseId + counter;
+                        counter++;
+                    }
+                }
+
+                const items = [];
+                document.querySelectorAll('.dynamic-row').forEach(row => {
+                    const nameInput = row.querySelector('.item-name');
+                    const specInput = row.querySelector('.item-spec');
+                    const qtyInput = row.querySelector('.item-qty');
+                    const priceInput = row.querySelector('.item-price');
+                    if(nameInput && qtyInput && priceInput) {
+                        items.push({
+                            name: nameInput.value,
+                            spec: specInput ? specInput.value : '',
+                            qty: parseInt(qtyInput.value),
+                            price: parseFloat(priceInput.value)
+                        });
+                    }
+                });
+
+                const materialsArr = [];
+                document.querySelectorAll('.material-row').forEach(row => {
+                    const matName = row.querySelector('.material-name-select');
+                    const matSpec = row.querySelector('.mat-spec');
+                    const matFactory = row.querySelector('.material-factory-select');
+                    const matQty = row.querySelector('.mat-qty');
+                    const matUnit = row.querySelector('.mat-unit');
+                    const matCost = row.querySelector('.mat-cost');
+                    
+                    if(matName && matCost) {
+                        materialsArr.push({
+                            name: matName.value,
+                            spec: matSpec ? matSpec.value : '',
+                            factory: matFactory ? matFactory.value : '',
+                            qty: matQty ? parseFloat(matQty.value) : 0,
+                            unit: matUnit ? matUnit.value : '',
+                            cost: parseFloat(matCost.value) || 0
+                        });
+                    }
+                });
+
+                const process = {};
+                
+                // 1. Collect Standard Processes
+                document.querySelectorAll('.process-check').forEach(check => {
+                    const key = check.getAttribute('data-process');
+                    const select = document.querySelector(`.factory-select[data-process="${key}"]`);
+                    const costInp = document.querySelector(`.process-cost[data-process="${key}"]`);
+                    
+                    // Skip die_cutting here if it's merged in cardbox
+                    if(key === 'die_cutting' && document.getElementById('category').value === 'cardbox') return;
+
+                    if(select.value || check.checked || (costInp && parseFloat(costInp.value) > 0)) {
+                        process[key] = {
+                            done: check.checked,
+                            factory: select.value,
+                            cost: parseFloat(costInp ? costInp.value : 0) || 0
+                        };
+                    }
+                });
+
+                // 2. Collect Merged Die Cut Process (Cardbox)
+                if (document.getElementById('category').value === 'cardbox') {
+                    const innerChk = document.getElementById('chk_die_inner');
+                    const cardChk = document.getElementById('chk_die_card');
+                    const select = document.querySelector(`.factory-select[data-process="die_cutting"]`);
+                    const costInp = document.querySelector(`.process-cost[data-process="die_cutting"]`);
+
+                    if (innerChk || cardChk || select.value || (costInp && parseFloat(costInp.value) > 0)) {
+                        process['die_cutting'] = {
+                            done_inner: innerChk.checked,
+                            done_card: cardChk.checked,
+                            factory: select.value,
+                            cost: parseFloat(costInp ? costInp.value : 0) || 0
+                        };
+                    }
+                }
+
+                const otherCost = parseFloat(document.getElementById('otherCost').value) || 0;
+                const taxRate = parseFloat(document.getElementById('taxRate').value) || 0;
+                const rebateRate = parseFloat(document.getElementById('rebateRate').value) || 0;
+                const totalPrice = parseFloat(document.getElementById('form-total-price').textContent) || 0;
+                const isAudited = document.getElementById('isAudited').checked;
+
+                const newOrder = {
+                    id: id,
+                    client: document.getElementById('clientName').value,
+                    category: document.getElementById('category').value,
+                    paymentStatus: document.getElementById('paymentStatus').value,
+                    orderDate: document.getElementById('orderDate').value,
+                    deliveryDate: document.getElementById('deliveryDate').value,
+                    items: items,
+                    totalPrice: totalPrice,
+                    materials: materialsArr,
+                    process: process,
+                    otherCost: otherCost,
+                    taxRate: taxRate,
+                    rebateRate: rebateRate,
+                    isAudited: isAudited,
+                    updatedAt: new Date().toISOString()
+                };
+
+                if (isNew) {
+                    orders.unshift(newOrder);
+                } else {
+                    const index = orders.findIndex(o => o.id === id);
+                    if (index !== -1) {
+                        orders[index] = newOrder;
+                    }
+                }
+
+                localStorage.setItem('printOrders_v8', JSON.stringify(orders));
+                handleSort(); 
+                updateStats();
+                closeModal('orderModal');
+                showToast("订单已保存成功");
+
+            } catch (err) {
+                console.error("保存失败:", err);
+                alert("保存时发生错误: " + err.message);
+            }
+        }
+
+        // --- Rendering & Stats ---
+        function getOrderFinancials(order) {
+            const grossPrice = order.totalPrice || 0;
+            const taxAmt = grossPrice * (order.taxRate || 0) / 100;
+            const rebateAmt = grossPrice * (order.rebateRate || 0) / 100;
+            const netRevenue = grossPrice - taxAmt - rebateAmt;
+
+            const matCost = order.materials ? order.materials.reduce((s, m) => s + m.cost, 0) : 0;
+            
+            // Calculation for Process Cost - Handle Merged Die Cut
+            let procCost = 0;
+            Object.values(order.process || {}).forEach(p => {
+                // If it has a cost property (standard or merged), add it
+                if (p.cost) procCost += p.cost;
+            });
+
+            const other = order.otherCost || 0;
+            const totalCost = matCost + procCost + other;
+            
+            const profit = netRevenue - totalCost;
+            return { grossPrice, netRevenue, totalCost, profit, taxAmt, rebateAmt, matCost, procCost, other };
+        }
+
+        function handleSort() {
+            const sortType = document.getElementById('sortSelect').value;
+            const sorted = [...orders].sort((a, b) => {
+                if (sortType === 'amount_desc') return b.totalPrice - a.totalPrice;
+                if (sortType === 'time_desc') return new Date(b.orderDate || b.updatedAt) - new Date(a.orderDate || a.updatedAt);
+                if (sortType === 'client_asc') return a.client.localeCompare(b.client, 'zh-CN');
+                return 0;
+            });
+            renderTable(sorted);
+        }
+
+        function renderTable(dataToRender = orders) {
+            const tbody = document.getElementById('order-table-body');
+            tbody.innerHTML = '';
+            if(dataToRender.length === 0) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:40px; color:#999;">暂无数据</td></tr>';
+
+            const labels = getProcessLabels();
+
+            dataToRender.forEach(order => {
+                const fin = getOrderFinancials(order);
+                
+                // --- UPDATE: Quote Item displays as Project Name only ---
+                const itemSummary = order.items.map(i => i.name).join(', ');
+
+                const processKeys = Object.keys(order.process || {});
+                
+                // Filter keys: if 'die_cutting' (merged) exists, ignore 'die_cut_inner'/'die_cut_card' if they exist separately (old data)
+                const validKeys = processKeys.filter(k => {
+                    if (k === 'die_cut_inner' || k === 'die_cut_card') {
+                        return !order.process['die_cutting'];
+                    }
+                    return true;
+                });
+
+                const totalSteps = validKeys.length;
+                const doneSteps = validKeys.filter(k => {
+                    const p = order.process[k];
+                    if (k === 'die_cutting' && (p.hasOwnProperty('done_inner'))) {
+                        // For merged, count as done if BOTH are done
+                        return p.done_inner && p.done_card;
+                    }
+                    return p.done;
+                }).length;
+                
+                const progressPercent = totalSteps === 0 ? 0 : Math.round((doneSteps / totalSteps) * 100);
+                
+                let badgesHTML = '';
+                validKeys.slice(0, 2).forEach(key => {
+                    const p = order.process[key];
+                    const name = labels[key] || key;
+                    let isDone = p.done;
+                    
+                    // Special logic for merged die cut display
+                    if (key === 'die_cutting' && (p.hasOwnProperty('done_inner'))) {
+                         // Simplified display for list: just show if "Done" or partial
+                         // Ideally show detail in preview, here just summary
+                         isDone = p.done_inner && p.done_card;
+                    }
+
+                    const cls = isDone ? 'st-done' : 'st-pending';
+                    badgesHTML += `<span class="status-badge ${cls}">${name}</span>`;
+                });
+                if(validKeys.length > 2) badgesHTML += `<span style="font-size:11px; color:#999;">+${validKeys.length - 2}</span>`;
+
+                const isDimmed = strictAuditMode && !order.isAudited;
+                const rowStyle = isDimmed ? 'opacity: 0.5; background-color: #fafafa;' : '';
+
+                const auditBadgeHTML = order.isAudited 
+                    ? `<span class="audit-badge audited">✓ 已审核</span>` 
+                    : `<span class="audit-badge unaudited">○ 待审核</span>`;
+
+                const tr = document.createElement('tr');
+                tr.style = rowStyle;
+                tr.innerHTML = `
+                    <td style="min-width:120px;">
+                        <div style="font-weight:600;">${order.id}</div>
+                        <div style="font-size:12px; color:#6b7280;">${order.orderDate || '-'}</div>
+                    </td>
+                    <td>
+                        <div style="font-weight:500;">${order.client}</div>
+                        <div style="font-size:12px; color:#666;">${categoryLabels[order.category]}</div>
+                    </td>
+                    <td style="font-size:13px; color:#374151; max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${itemSummary}">${itemSummary}</td>
+                    <td>
+                        <div style="font-size:13px;">收: <span style="color:var(--primary-color);">¥${fin.grossPrice.toLocaleString()}</span></div>
+                        <div style="font-size:12px; font-weight:bold;">利: <span class="${fin.profit>=0?'cost-positive':'cost-negative'}">¥${fin.profit.toLocaleString()}</span></div>
+                    </td>
+                    <td style="min-width:100px;">
+                        <div style="margin-bottom:4px;">${auditBadgeHTML}</div>
+                        <div style="font-size:11px;">${badgesHTML}</div>
+                        <div style="height:4px; background:#eee; border-radius:2px; overflow:hidden;">
+                            <div style="height:100%; background:var(--success); width:${progressPercent}%"></div>
+                        </div>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline" onclick="previewOrder('${order.id}')">预览</button>
+                        <button class="btn btn-sm btn-outline" onclick="copyOrder('${order.id}')">复制</button>
+                        <button class="btn btn-sm btn-outline" onclick="openModal('${order.id}')">编辑</button>
+                        <button class="btn btn-sm btn-danger" style="border:none; background:none;" onclick="deleteOrder('${order.id}')">✕</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderCostTable() {
+            const tbody = document.getElementById('cost-table-body');
+            tbody.innerHTML = '';
+            
+            let displayOrders = orders;
+            if(strictAuditMode) {
+                displayOrders = orders.filter(o => o.isAudited);
+            }
+
+            const alertEl = document.getElementById('cost-view-header-alert');
+            if(strictAuditMode) {
+                alertEl.textContent = "⚠ 当前仅显示已审核订单的财务数据";
+            } else {
+                alertEl.textContent = "";
+            }
+
+            displayOrders.forEach(order => {
+                const fin = getOrderFinancials(order);
+                const margin = fin.grossPrice > 0 ? ((fin.profit / fin.grossPrice) * 100).toFixed(1) + '%' : '0%';
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${order.id} ${!order.isAudited ? '<span style="color:#999;font-size:11px;">(未审)</span>' : ''}</td>
+                    <td>${order.client}</td>
+                    <td style="color:var(--primary-color)">¥${fin.grossPrice.toFixed(2)}</td>
+                    <td style="color:#666; font-size:12px;">税${(order.taxRate||0)}% 返${(order.rebateRate||0)}%</td>
+                    <td style="font-weight:bold;">¥${fin.netRevenue.toFixed(2)}</td>
+                    <td>¥${fin.matCost.toFixed(2)}</td>
+                    <td>¥${fin.procCost.toFixed(2)}</td>
+                    <td>¥${fin.other.toFixed(2)}</td>
+                    <td style="color:var(--danger)">¥${fin.totalCost.toFixed(2)}</td>
+                    <td class="${fin.profit>=0?'cost-positive':'cost-negative'}">¥${fin.profit.toFixed(2)}</td>
+                    <td>${margin}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateStats() {
+            let totalGross = 0;
+            let totalNet = 0;
+            let totalCost = 0;
+            let unpaidCount = 0;
+            let activeCount = 0;
+
+            const countedOrders = strictAuditMode ? orders.filter(o => o.isAudited) : orders;
+
+            countedOrders.forEach(o => {
+                const fin = getOrderFinancials(o);
+                totalGross += fin.grossPrice;
+                totalNet += fin.netRevenue;
+                totalCost += fin.totalCost;
+                if(o.paymentStatus !== 'paid') unpaidCount++;
+                
+                const procs = Object.values(o.process || {});
+                if(procs.length > 0) {
+                     // Check active logic for merged die cut
+                     const isDone = (p) => {
+                         if (p.hasOwnProperty('done_inner')) return p.done_inner && p.done_card;
+                         return p.done;
+                     }
+                     if (!procs.every(isDone)) activeCount++;
+                }
+            });
+
+            document.getElementById('stat-total').textContent = countedOrders.length;
+            document.getElementById('stat-revenue').textContent = totalNet.toLocaleString();
+            document.getElementById('stat-cost').textContent = totalCost.toLocaleString();
+            
+            const totalProfit = totalNet - totalCost;
+            const profitEl = document.getElementById('stat-profit');
+            profitEl.textContent = totalProfit.toLocaleString();
+            profitEl.style.color = totalProfit >= 0 ? 'var(--profit)' : 'var(--danger)';
+
+            document.getElementById('stat-unpaid').textContent = unpaidCount;
+            const activeEl = document.getElementById('stat-active');
+            if(activeEl) activeEl.textContent = activeCount;
+        }
+
+        function deleteOrder(id) {
+            if(confirm('确定删除该订单？')) {
+                orders = orders.filter(o => o.id !== id);
+                localStorage.setItem('printOrders_v8', JSON.stringify(orders));
+                handleSort(); updateStats(); showToast("订单已删除");
+            }
+        }
+
+        // --- Sync ---
+        function exportData() {
+            const data = { orders, factories, materials, customProcesses, strictAuditMode };
+            const blob = new Blob([JSON.stringify(data)], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = "印刷订单备份_v8_" + new Date().toISOString().slice(0,10) + ".json";
+            a.click();
+            showToast("数据已导出");
+        }
+        function triggerImport() { document.getElementById('fileInput').click(); }
+        function importData(input) {
+            const file = input.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if(confirm('导入将覆盖当前所有数据，确定吗？')) {
+                        orders = data.orders || [];
+                        factories = data.factories || [];
+                        materials = data.materials || [];
+                        customProcesses = data.customProcesses || [];
+                        strictAuditMode = data.strictAuditMode || false;
+                        
+                        document.getElementById('auditFilterToggle').checked = strictAuditMode;
+                        updateAuditLabel();
+
+                        localStorage.setItem('printOrders_v8', JSON.stringify(orders));
+                        localStorage.setItem('printAuditMode_v8', JSON.stringify(strictAuditMode));
+                        saveSettings();
+                        
+                        renderFactoryOptions(); renderMaterialOptions(); renderProcessFormList();
+                        renderTable(); updateStats();
+                        showToast("数据已同步");
+                    }
+                } catch(err) { alert("文件格式错误"); }
+                input.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById("toast");
+            t.textContent = msg; t.className = "show";
+            setTimeout(() => { t.className = t.className.replace("show", ""); }, 3000);
+        }
+
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal-overlay')) event.target.style.display = "none";
+        }
+    </script>
+    <datalist id="unit-list">
+        <option value="张">
+        <option value="令">
+        <option value="米">
+        <option value="卷">
+        <option value="KG">
+    </datalist>
+</body>
+</html>
