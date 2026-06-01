@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#FB923C;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#F472B6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+  <!-- Camera body -->
+  <rect x="140" y="170" width="232" height="180" rx="24" fill="white" opacity="0.95"/>
+  <!-- Camera lens outer -->
+  <circle cx="256" cy="255" r="58" fill="#FB923C" opacity="0.3"/>
+  <circle cx="256" cy="255" r="44" fill="#FB923C" opacity="0.5"/>
+  <!-- Camera lens inner -->
+  <circle cx="256" cy="255" r="28" fill="white" opacity="0.8"/>
+  <circle cx="256" cy="255" r="16" fill="#FB923C"/>
+  <!-- Camera flash -->
+  <rect x="308" y="185" width="36" height="24" rx="6" fill="white" opacity="0.6"/>
+  <!-- Camera top bump -->
+  <rect x="210" y="150" width="92" height="28" rx="8" fill="white" opacity="0.9"/>
+  <!-- Heart -->
+  <path d="M256 160 c-12-20-40-28-58-12-18 16-16 44 2 64 l56 64 56-64 c18-20 20-48 2-64-18-16-46-8-58 12z" fill="white" opacity="0.35" transform="translate(0,-10)"/>
+</svg>

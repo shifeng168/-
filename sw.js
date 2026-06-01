@@ -1,36 +1,46 @@
-const CACHE_NAME = 'baby-album-v8';
-const SHELL_URL = './悠悠时光.html';
+const CACHE_NAME = 'baby-album-v1'
+const STATIC_ASSETS = [
+  '/',
+  '/index.html',
+]
 
-self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll([SHELL_URL]))
-  );
-  self.skipWaiting();
-});
+// 安装：缓存静态资源
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
+  )
+  self.skipWaiting()
+})
 
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
+// 激活：清除旧缓存
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
     )
-  );
-  self.clients.claim();
-});
+  )
+  self.clients.claim()
+})
 
-self.addEventListener('fetch', (e) => {
-  if (e.request.method !== 'GET') return;
-  const url = new URL(e.request.url);
-  if (url.hostname.includes('supabase.co') || url.hostname.includes('qiniup.com') || url.hostname.includes('yoyobaby.asia')) return;
+// 请求：网络优先，失败用缓存
+self.addEventListener('fetch', (event) => {
+  // 只处理 GET 请求
+  if (event.request.method !== 'GET') return
 
-  e.respondWith(
-    fetch(e.request)
-      .then((res) => {
-        if (res.ok) {
-          const clone = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+  // Supabase API 请求不缓存
+  const url = new URL(event.request.url)
+  if (url.hostname.includes('supabase.co')) return
+
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        // 成功获取后缓存响应
+        if (response.ok) {
+          const clone = response.clone()
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone))
         }
-        return res;
+        return response
       })
-      .catch(() => caches.match(e.request).then((cached) => cached || caches.match(SHELL_URL)))
-  );
-});
+      .catch(() => caches.match(event.request))
+  )
+})
