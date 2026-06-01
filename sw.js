@@ -1,7 +1,7 @@
-// SW v16 — fix: main 容器高度适配 Virtuoso
+// SW v15 — fix: JSON 元数据不缓存
 // 策略: 应用壳 Cache-First, CDN资产 Stale-While-Revalidate, API Network-Only
 
-const CACHE_APP = 'yoyo-app-v16'
+const CACHE_APP = 'yoyo-app-v15'
 const CACHE_CDN = 'yoyo-cdn-v1'
 const CACHE_THUMBS = 'yoyo-thumbs-v1'
 
