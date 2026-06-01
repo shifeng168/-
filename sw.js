@@ -1,7 +1,7 @@
-// SW v14 — 悠悠时光性能优化版
+// SW v15 — fix: JSON 元数据不缓存
 // 策略: 应用壳 Cache-First, CDN资产 Stale-While-Revalidate, API Network-Only
 
-const CACHE_APP = 'yoyo-app-v14'
+const CACHE_APP = 'yoyo-app-v15'
 const CACHE_CDN = 'yoyo-cdn-v1'
 const CACHE_THUMBS = 'yoyo-thumbs-v1'
 
@@ -46,8 +46,13 @@ self.addEventListener('fetch', (event) => {
   // 七牛云上传 API — 不缓存
   if (host.includes('qiniup.com') || host.includes('qiniuapi.com')) return
 
-  // 七牛云 CDN  — Stale-While-Revalidate（先缓存后更新）
+  // 七牛云 CDN
   if (host === CDN_HOST) {
+    // JSON 元数据文件 — 永不缓存，始终 Network-First
+    if (url.pathname.endsWith('.json')) {
+      return // 让浏览器正常请求，不走 SW
+    }
+
     // 缩略图用独立缓存，更长生命周期
     const cacheName = url.pathname.includes('thumb_') ? CACHE_THUMBS : CACHE_CDN
 
