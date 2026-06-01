@@ -1,4 +1,4 @@
-const CACHE_NAME = 'baby-album-v11';
+const CACHE_NAME = 'baby-album-v8';
 const SHELL_URL = './悠悠时光.html';
 
 self.addEventListener('install', (e) => {
