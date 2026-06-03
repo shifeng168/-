@@ -1,8 +1,8 @@
-// SW v19 — 视频秒开: Range请求支持 + 激进预缓存 + SWR策略
+// SW v21 — 强制刷新: 修复缓存导致的空白页 + Range请求支持 + SWR策略
 // 策略: CDN视频 Stale-While-Revalidate, 缩略图 Cache-First, API Network-Only
 
-const CACHE_APP = 'yoyo-app-v19'
-const CACHE_CDN = 'yoyo-cdn-v3'
+const CACHE_APP = 'yoyo-app-v21'
+const CACHE_CDN = 'yoyo-cdn-v4'
 const CACHE_THUMBS = 'yoyo-thumbs-v2'
 const CACHE_VIDEOS = 'yoyo-videos-v1'
 
