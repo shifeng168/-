@@ -1,6 +1,5 @@
-// SW v23 — OSS 迁移 + 简化策略
-// CDN 资源(七牛云/OSS)直通不走 SW，由浏览器缓存+CDN处理
-// App 资源(JS/CSS/HTML) Network-First 缓存
+// SW v23 - 阿里云 OSS
+// CDN / OSS / API
 
 const CACHE_NAME = 'baby-album-v23'
 const SHELL_URL = './悠悠时光.html'
@@ -25,13 +24,11 @@ self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return
   const url = new URL(e.request.url)
 
-  // CDN / API 直通: 七牛云存量 + OSS 新增 + Supabase + Server酱
+  // CDN / API direct
   if (
-    url.hostname.includes('yoyobaby.asia') ||
     url.hostname.includes('aliyuncs.com') ||
     url.hostname.includes('supabase.co') ||
-    url.hostname.includes('sctapi.ftqq.com') ||
-    url.hostname.includes('qiniup.com')
+    url.hostname.includes('sctapi.ftqq.com')
   ) return
 
   e.respondWith(
