@@ -2,19 +2,49 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#FFF7ED" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- 七牛云 CDN 预连接 + 预加载（加速视频/图片加载） -->
-    <link rel="preconnect" href="https://yoyobaby.asia" crossorigin />
+    <meta name="description" content="悠悠时光 - 宝宝成长记录相册" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="悠悠时光" />
+    <link rel="apple-touch-icon" href="icon-192.png" />
+
+    <!-- DNS 预解析 -->
     <link rel="dns-prefetch" href="https://yoyobaby.asia" />
-    <link rel="preconnect" href="https://up.qiniup.com" crossorigin />
-    <link rel="dns-prefetch" href="https://up.qiniup.com" />
-    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+    <!-- 七牛云 CDN 预连接（关键资源域名，提前建立 TCP+TLS 连接） -->
+    <link rel="preconnect" href="https://yoyobaby.asia" crossorigin />
+
+    <!-- 字体：font-display:swap 已通过 URL 参数生效，避免 FOIT -->
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@300;400;500;600;700&display=swap"
+      onload="this.onload=null;this.rel='stylesheet'"
+    />
+    <noscript>
+      <link
+        href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet"
+      />
+    </noscript>
+
     <title>悠悠时光</title>
-    <script type="module" crossorigin src="./assets/index-DdfI_-8G.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-Wjwho5H9.css">
+
+    <!-- Service Worker 注册：尽早启动以加速后续导航 -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(function() {});
+        });
+      }
+    </script>
+    <script type="module" crossorigin src="./assets/index-JaxvJzIS.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/vendor-react-DFYYs-ML.js">
+    <link rel="modulepreload" crossorigin href="./assets/vendor-ui-CRrc5jUb.js">
+    <link rel="modulepreload" crossorigin href="./assets/vendor-utils-DeRmtv56.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-qtZcHbR-.css">
   </head>
   <body>
     <div id="root"></div>

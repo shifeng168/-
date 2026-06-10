@@ -1,54 +1,63 @@
-// SW v21 — 强制刷新: 修复缓存导致的空白页 + Range请求支持 + SWR策略
-// 策略: CDN视频 Stale-While-Revalidate, 缩略图 Cache-First, API Network-Only
+// SW v22 — 性能优化: Navigation Preload + SWR + 智能缓存分层
+// 策略: CDN→SWR, 缩略图→Cache-First, API→Network-Only, App资源→Stale-While-Revalidate
 
-const CACHE_APP = 'yoyo-app-v21'
-const CACHE_CDN = 'yoyo-cdn-v4'
-const CACHE_THUMBS = 'yoyo-thumbs-v2'
-const CACHE_VIDEOS = 'yoyo-videos-v1'
+const CACHE_APP = 'yoyo-app-v22'
+const CACHE_STATIC = 'yoyo-static-v1'  // 长期缓存的大文件(图片/video)
+const CACHE_THUMBS = 'yoyo-thumbs-v3'
+const CACHE_VIDEOS = 'yoyo-videos-v2'
 
-// 静态壳资源
-const SHELL_FILES = ['/', '/index.html']
-
-// 七牛云 CDN 域名
 const CDN_HOST = 'yoyobaby.asia'
 
-// 视频最大缓存大小 (100MB)
-const MAX_VIDEO_CACHE_SIZE = 100 * 1024 * 1024
-
-// ---- 安装 ----
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_APP).then((cache) => cache.addAll(SHELL_FILES))
-  )
-  self.skipWaiting()
-})
-
-// ---- 激活 ----
+// ---- 激活: 启用 Navigation Preload 并清理旧缓存 ----
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) =>
-            key !== CACHE_APP &&
-            key !== CACHE_CDN &&
-            key !== CACHE_THUMBS &&
-            key !== CACHE_VIDEOS
-          )
-          .map((key) => caches.delete(key))
-      )
-    )
+    Promise.all([
+      // 启用 Navigation Preload (加速 HTML 请求)
+      self.registration?.navigationPreload?.enable?.() || Promise.resolve(),
+      // 清理所有旧版本缓存
+      caches.keys().then((keys) =>
+        Promise.all(
+          keys
+            .filter((key) =>
+              key !== CACHE_APP &&
+              key !== CACHE_STATIC &&
+              key !== CACHE_THUMBS &&
+              key !== CACHE_VIDEOS
+            )
+            .map((key) => caches.delete(key))
+        )
+      ),
+    ])
   )
   self.clients.claim()
 })
 
-// ---- Range 请求辅助 ----
-function parseRangeHeader(rangeHeader, fileSize) {
-  const matches = rangeHeader.match(/bytes=(\d+)-(\d*)/)
-  if (!matches) return null
-  const start = parseInt(matches[1], 10)
-  const end = matches[2] ? parseInt(matches[2], 10) : fileSize - 1
-  return { start, end }
+// ---- SWR 通用缓存策略 ----
+async function swrResponse(request, cacheName) {
+  const cache = await caches.open(cacheName)
+  const cached = await cache.match(request)
+
+  const fetchPromise = fetch(request).then((response) => {
+    if (response.ok) {
+      cache.put(request, response.clone())
+    }
+    return response
+  }).catch(() => cached)
+
+  return cached || fetchPromise
+}
+
+// ---- Cache-First 策略(用于缩略图) ----
+async function cacheFirst(request, cacheName) {
+  const cache = await caches.open(cacheName)
+  const cached = await cache.match(request)
+  if (cached) return cached
+
+  const response = await fetch(request)
+  if (response.ok) {
+    cache.put(request, response.clone())
+  }
+  return response
 }
 
 // ---- 请求拦截 ----
@@ -58,146 +67,105 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url)
   const host = url.hostname
 
-  // Supabase API — 不缓存
-  if (host.includes('supabase.co')) return
+  // API 请求 — 永不缓存
+  if (host.includes('supabase.co') || host.includes('qiniup.com') || host.includes('qiniuapi.com') || host.includes('sctapi.ftqq.com')) {
+    return
+  }
 
-  // 七牛云上传 API — 不缓存
-  if (host.includes('qiniup.com') || host.includes('qiniuapi.com')) return
+  // JSON 元数据文件 — Network-Only (不缓存)
+  if (host === CDN_HOST && url.pathname.endsWith('.json')) return
 
-  // 七牛云 CDN
+  // 七牛云 CDN 资源
   if (host === CDN_HOST) {
-    // JSON 元数据文件 — 永不缓存
-    if (url.pathname.endsWith('.json')) return
+    const path = url.pathname
+    const isThumb = path.includes('thumb_')
+    const isVideo = /\.(mp4|mov|avi|webm|mkv)($|\?)/i.test(path)
+    const isPreview = path.includes('preview_')
+    const isImage = /\.(jpg|jpeg|png|gif|webp|heic|bmp)($|\?)/i.test(path)
 
-    const isThumb = url.pathname.includes('thumb_')
-    const isVideo = url.pathname.match(/\.(mp4|mov|avi|webm|mkv)($|\?)/i)
-    const isPreview = url.pathname.includes('preview_')
-
-    // 缩略图 — Cache-First（小文件，命中率高）
+    // 缩略图 — Cache-First（文件小，命中率高，秒加载）
     if (isThumb) {
-      event.respondWith(
-        caches.match(event.request).then((cached) =>
-          cached || fetch(event.request).then((response) => {
-            if (response.ok) {
-              const clone = response.clone()
-              caches.open(CACHE_THUMBS).then((cache) => cache.put(event.request, clone))
-            }
-            return response
-          })
-        )
-      )
+      event.respondWith(cacheFirst(event.request, CACHE_THUMBS))
       return
     }
 
     // 预览视频 — SWR（小文件快速加载）
     if (isPreview) {
+      event.respondWith(swrResponse(event.request, CACHE_STATIC))
+      return
+    }
+
+    // 视频 + Range 请求 — Network-First (支持拖动进度条)
+    if (isVideo && event.request.headers.get('range')) {
       event.respondWith(
-        caches.match(event.request).then((cached) =>
-          cached || fetch(event.request).then((response) => {
-            if (response.ok) {
-              const clone = response.clone()
-              caches.open(CACHE_CDN).then((cache) => cache.put(event.request, clone))
-            }
-            return response
-          })
-        )
+        fetch(event.request).then((response) => {
+          if (response.status === 200 || response.status === 206) {
+            const clone = response.clone()
+            caches.open(CACHE_VIDEOS).then((cache) => cache.put(event.request, clone))
+          }
+          return response
+        }).catch(() => caches.match(event.request))
       )
       return
     }
 
-    // 完整视频 — 支持 Range 请求 + SWR
+    // 完整视频(非Range) — SWR
     if (isVideo) {
-      const rangeHeader = event.request.headers.get('range')
-
-      if (rangeHeader) {
-        // Range 请求：直接从网络获取（浏览器处理 seek）
-        // 同时缓存完整响应供后续使用
-        event.respondWith(
-          fetch(event.request).then((response) => {
-            // 缓存 200 响应（非 Range），供下次使用
-            if (response.status === 200 && response.ok) {
-              const clone = response.clone()
-              caches.open(CACHE_VIDEOS).then((cache) =>
-                cache.put(event.request, clone)
-              )
-            }
-            return response
-          }).catch(() => {
-            // 网络失败时尝试从缓存提供 Range
-            return caches.match(event.request.url.replace(/\?.*$/, ''))
-              .then((cached) => {
-                if (!cached) return new Response('', { status: 416 })
-                // 简单处理：返回完整缓存（浏览器会自己处理）
-                return cached
-              })
-          })
-        )
-      } else {
-        // 非 Range 请求：SWR 策略
-        event.respondWith(
-          caches.match(event.request).then((cached) => {
-            const fetchPromise = fetch(event.request).then((response) => {
-              if (response.ok) {
-                const clone = response.clone()
-                caches.open(CACHE_VIDEOS).then(async (cache) => {
-                  // 限制视频缓存总量
-                  cache.put(event.request, clone)
-                })
-              }
-              return response
-            }).catch(() => cached)
-
-            return cached || fetchPromise
-          })
-        )
-      }
+      event.respondWith(swrResponse(event.request, CACHE_VIDEOS))
       return
     }
 
-    // 其他 CDN 资源（图片等）— SWR
-    event.respondWith(
-      caches.match(event.request).then((cached) => {
-        const fetchPromise = fetch(event.request).then((response) => {
-          if (response.ok) {
-            const clone = response.clone()
-            caches.open(CACHE_CDN).then((cache) => cache.put(event.request, clone))
-          }
-          return response
-        }).catch(() => cached)
+    // 图片等静态文件 — SWR
+    if (isImage) {
+      event.respondWith(swrResponse(event.request, CACHE_STATIC))
+      return
+    }
 
-        return cached || fetchPromise
-      })
-    )
+    // 其他 CDN 资源
+    event.respondWith(swrResponse(event.request, CACHE_STATIC))
     return
   }
 
-  // 应用资源 — Cache-First
-  if (event.request.destination === 'script' ||
-      event.request.destination === 'style' ||
-      event.request.destination === 'image' ||
-      event.request.destination === 'font') {
-    event.respondWith(
-      caches.match(event.request).then((cached) =>
-        cached || fetch(event.request).then((response) => {
-          if (response.ok) {
-            const clone = response.clone()
-            caches.open(CACHE_APP).then((cache) => cache.put(event.request, clone))
-          }
-          return response
-        })
-      )
-    )
+  // 应用资源 (JS/CSS/Font) — Cache-First
+  const dest = event.request.destination
+  if (dest === 'script' || dest === 'style' || dest === 'font') {
+    event.respondWith(cacheFirst(event.request, CACHE_APP))
     return
   }
 
-  // HTML 请求 — Network-First
-  event.respondWith(
-    fetch(event.request).then((response) => {
-      if (response.ok) {
-        const clone = response.clone()
-        caches.open(CACHE_APP).then((cache) => cache.put(event.request, clone))
-      }
-      return response
-    }).catch(() => caches.match(event.request))
-  )
+  // 图片（应用内资源）— SWR
+  if (dest === 'image') {
+    event.respondWith(swrResponse(event.request, CACHE_APP))
+    return
+  }
+
+  // HTML — Network-First (配合 Navigation Preload)
+  if (dest === 'document' || event.request.mode === 'navigate') {
+    event.respondWith(
+      (async () => {
+        try {
+          // 优先使用 navigation preload 响应
+          const preloadResponse = await event.preloadResponse
+          if (preloadResponse) {
+            // 更新缓存
+            caches.open(CACHE_APP).then((cache) => cache.put(event.request, preloadResponse.clone()))
+            return preloadResponse
+          }
+        } catch {}
+
+        // Fallback: Network-First
+        try {
+          const response = await fetch(event.request)
+          if (response.ok) {
+            caches.open(CACHE_APP).then((cache) => cache.put(event.request, response.clone()))
+          }
+          return response
+        } catch {
+          const cached = await caches.match(event.request)
+          return cached || Response.error()
+        }
+      })()
+    )
+    return
+  }
 })
